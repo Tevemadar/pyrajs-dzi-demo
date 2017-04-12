@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Meet Pocak</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width">
+        <style>
+            body{margin: 0}
+            canvas{display: block;cursor: crosshair;}
+        </style>
+        <script src="cache.js"></script>
+        <script src="zoomer.js"></script>
+        <script>
+            var set="Pocak";
+            function startup(){
+                var xhr=new XMLHttpRequest();
+                xhr.open("GET",set+".xml");
+                xhr.onload=DZIReady;
+                xhr.send();
+            }
+            function DZIReady(event){
+                var doc=event.target.responseXML.documentElement;
+                var size=doc.getElementsByTagName("Size").item(0);
+                var DZIcfg={
+                    TileSize:parseInt(doc.getAttribute("TileSize")),
+                    Overlap:parseInt(doc.getAttribute("Overlap")),
+                    Format:doc.getAttribute("Format"),
+                    Width:parseInt(size.getAttribute("Width")),
+                    Height:parseInt(size.getAttribute("Height")),
+                    MaxLevel:0
+                };
+                var w=DZIcfg.Width;
+                var h=DZIcfg.Height;
+                while(w>1 || h>1)
+                {
+                    w=(w+1)>>1;
+                    h=(h+1)>>1;
+                    DZIcfg.MaxLevel++;
+                }
+
+                DZIcfg.Key=function(level,x,y){
+                    return set+"/"+(this.MaxLevel-level)+"/"+x+"_"+y+"."+this.Format;
+                };
+                DZIcfg.Load=function(key,x,y,next){
+                    var img=document.createElement("img");
+                    var canvas=document.createElement("canvas");
+                    canvas.width=DZIcfg.TileSize;
+                    canvas.height=DZIcfg.TileSize;
+                    img.onload=function(){
+                        canvas.getContext("2d").drawImage(img,x===0?0:-DZIcfg.Overlap,y===0?0:-DZIcfg.Overlap);
+                        next(canvas);
+                    };
+                    img.src=key;
+                };
+                
+                var cnv=document.getElementById("zoomer");
+                cnv.width=window.innerWidth;
+                cnv.height=window.innerHeight;
+
+                new Zoomer(cnv,DZIcfg).fullcanvas();
+            }
+        </script>
+    </head>
+    <body onload="startup()">
+        <canvas id="zoomer"></canvas>
+    </body>
+</html>
