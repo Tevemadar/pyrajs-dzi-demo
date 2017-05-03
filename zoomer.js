@@ -99,7 +99,25 @@ function Zoomer(canvas,cfg) {
                     var key=cfg.Key(level,ex,ey);
                     var tile=cache.get(key);
                     if(!tile)
+                    {
                         loading.push({x:x,y:y,ex:ex,ey:ey,key:key});
+                        (function(ex,ey,level){
+                            var ox=ex,oy=ey;
+                            var size=tilesize;
+                            var mask=0;
+                            while(!tile && level<maxlevel){
+                                size >>= 1;
+                                mask=(mask<<1)+1;
+                                ex >>= 1;
+                                ey >>= 1;
+                                level++;
+                                key=cfg.Key(level,ex,ey);
+                                tile=cache.get(key);
+                            }
+                            if(tile)
+                                ctx.drawImage(tile,(ox&mask)*size,(oy&mask)*size,size,size,x*tilesize,y*tilesize,tilesize,tilesize);
+                        })(ex,ey,level);
+                    }
                     else
                         drawTile(tile,x,y);
                 }
