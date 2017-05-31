@@ -126,13 +126,15 @@ function Zoomer(canvas,cfg) {
 
         (function loadloop()
         {
-            if(loading.length===0 || viewnumber!==loadingnumber)return;
+            if(loading.length===0)return;
             var loaditem=loading.pop();
             cfg.Load(loaditem.key,loaditem.ex,loaditem.ey,function(tile){
                 cache.put(loaditem.key,tile);
-                drawTile(tile,loaditem.x,loaditem.y);
-                drawImage();
-                loadloop();
+                if(viewnumber===loadingnumber){
+                    drawTile(tile,loaditem.x,loaditem.y);
+                    drawImage();
+                    loadloop();
+                }
             });
         })();
     }
