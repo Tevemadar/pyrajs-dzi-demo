@@ -1,190 +1,189 @@
-function Zoomer(canvas,cfg) {
-    var cache=new LRUCache(300);
+class Zoomer {
+    #cache = new LRUCache(300);
+    #canvas;
+    #cfg;
+    #handlers = {};
+    constructor(canvas, cfg) {
+        this.#canvas = canvas;
+        this.#cfg = cfg;
+        const h = this.#handlers;
+        canvas.addEventListener("mousedown", h.mdown = e => this.#mdown(e), true);
+        canvas.addEventListener("mouseup", h.mup = e => this.#mup(e), true);
+        canvas.addEventListener("mousemove", h.mmove = e => this.#mmove(e), true);
+        canvas.addEventListener("wheel", h.mwheel = e => this.#mwheel(e), true);
+    }
 
-    var canvaswidth=0;
-    var canvasheight=0;
-    var view=null; // cutx-cuty-cutw-cuth visible portion of image (in image pixels)
+    destroy() {
+        ++this.#viewnumber;
+        const c = this.#canvas;
+        const h = this.#handlers;
+        c.removeEventListener("mousedown", h.mdown, true);
+        c.removeEventListener("mouseup", h.mup, true);
+        c.removeEventListener("mousemove", h.mmove, true);
+        c.removeEventListener("wheel", h.mwheel, true);
+    }
 
-    this.fullcanvas=function()
-    {
-        canvaswidth=canvas.width;
-        canvasheight=canvas.height;
-        var w=cfg.Width;
-        var h=cfg.Height;
-        if(w/h<canvaswidth/canvasheight)
-        {
-            view={
-                cutx:(w-h*canvaswidth/canvasheight)/2,
-                cuty:0,
-                cutw:h*canvaswidth/canvasheight,
-                cuth:h
+    #view;
+    home() {
+        const cw = this.#canvas.width;
+        const ch = this.#canvas.height;
+        const w = this.#cfg.Width;
+        const h = this.#cfg.Height;
+        if (w / h < cw / ch) {
+            this.#view = {
+                cutx: (w - h * cw / ch) / 2,
+                cuty: 0,
+                cutw: h * cw / ch,
+                cuth: h
+            };
+        } else {
+            this.#view = {
+                cutx: 0,
+                cuty: (h - w * ch / cw) / 2,
+                cutw: w,
+                cuth: w * ch / cw
             };
         }
-        else
-        {
-            view={
-                cutx:0,
-                cuty:(h-w*canvasheight/canvaswidth)/2,
-                cutw:w,
-                cuth:w*canvasheight/canvaswidth
-            };
-        }
-        prepare();
-    };
-    
-    var viewnumber=0;
-    
-    this.redraw=prepare;
-    function prepare()
-    {
-        var cutx=view.cutx;
-        var cuty=view.cuty;
-        var cutw=view.cutw;
-        var cuth=view.cuth;
+        this.#prepare();
+    }
 
-        var loadingnumber=++viewnumber;
+    #canvaswidth;
+    #canvasheight;
+    #viewnumber = 0;
+    #prepare() {
+        const dizcfg = this.#cfg;
+        const dizcache = this.#cache;
+        const dizcanvaswidth = this.#canvaswidth = this.#canvas.width;
+        const dizcanvasheight = this.#canvasheight = this.#canvas.height;
 
-        var planewidth=cfg.Width;
-        var planeheight=cfg.Height;
-        var tilesize=cfg.TileSize;
-        var maxlevel=cfg.MaxLevel;
-        var level=0;
-        while((cutw>=canvaswidth*2)&&(cuth>=canvasheight*2)&&(level<maxlevel))
-        {
-            planewidth=(planewidth+1)>>1;
-            planeheight=(planeheight+1)>>1;
-            cutw=(cutw+1)>>1;
-            cuth=(cuth+1)>>1;
-            cutx=(cutx+1)>>1;
-            cuty=(cuty+1)>>1;
+        var cutx = this.#view.cutx;
+        var cuty = this.#view.cuty;
+        var cutw = this.#view.cutw;
+        var cuth = this.#view.cuth;
+
+        var loadingnumber = ++this.#viewnumber;
+
+        var planewidth = this.#cfg.Width;
+        var planeheight = this.#cfg.Height;
+        var tilesize = this.#cfg.TileSize;
+        var maxlevel = this.#cfg.MaxLevel;
+        var level = 0;
+        while ((cutw >= this.#canvaswidth * 2) && (cuth >= this.#canvasheight * 2) && (level < maxlevel)) {
+            planewidth = (planewidth + 1) >> 1;
+            planeheight = (planeheight + 1) >> 1;
+            cutw = (cutw + 1) >> 1;
+            cuth = (cuth + 1) >> 1;
+            cutx = (cutx + 1) >> 1;
+            cuty = (cuty + 1) >> 1;
             level++;
         }
-        var tx=Math.floor(cutx/tilesize);
-        var ty=Math.floor(cuty/tilesize);
-        var tw=Math.floor((cutx+cutw)/tilesize-tx+1);
-        var th=Math.floor((cuty+cuth)/tilesize-ty+1);
+        var tx = Math.floor(cutx / tilesize);
+        var ty = Math.floor(cuty / tilesize);
+        var tw = Math.floor((cutx + cutw) / tilesize - tx + 1);
+        var th = Math.floor((cuty + cuth) / tilesize - ty + 1);
 
-        var image=document.createElement("canvas");
-        image.width=tw*tilesize;
-        image.height=th*tilesize;
-        var ctx=image.getContext("2d");
+        var image = document.createElement("canvas");
+        image.width = tw * tilesize;
+        image.height = th * tilesize;
+        var ctx = image.getContext("2d");
 
-        var mainctx=canvas.getContext("2d");
-        var tempx=cutx;
-        while(tempx<0)tempx+=tilesize;
-        var tempy=cuty;
-        while(tempy<0)tempy+=tilesize;
-        function drawImage()
-        {
-            mainctx.globalAlpha=1;
-            mainctx.fillStyle=cfg.FillStyle || "#FFFFFF";
-            mainctx.fillRect(0,0,canvaswidth,canvasheight);
-            mainctx.drawImage(image,tempx % tilesize,tempy % tilesize,cutw,cuth,0,0,canvaswidth,canvasheight);
-        };
+        var mainctx = this.#canvas.getContext("2d");
+        cutx = (cutx % tilesize + tilesize) % tilesize;
+        cuty = (cuty % tilesize + tilesize) % tilesize;
 
-        function drawTile(tile,x,y)
-        {
-            ctx.drawImage(tile,x*tilesize,y*tilesize);
+        function drawImage() {
+            mainctx.globalAlpha = 1;
+            mainctx.fillStyle = dizcfg.FillStyle || "#FFFFFF";
+            mainctx.fillRect(0, 0, dizcanvaswidth, dizcanvasheight);
+            mainctx.drawImage(image, cutx, cuty, cutw, cuth, 0, 0, dizcanvaswidth, dizcanvasheight);
         }
 
-        var loading=[];
+        function drawTile(tile, x, y) {
+            ctx.drawImage(tile, x * tilesize, y * tilesize);
+        }
 
-        for(var y=th-1;y>=0;y--)
-            for(var x=tw-1;x>=0;x--)
-            {
-                var ex=tx+x;
-                var ey=ty+y;
-                if(ex>=0 && ey>=0 && ex*tilesize<planewidth && ey*tilesize<planeheight)
-                {
-                    var key=cfg.Key(level,ex,ey);
-                    var tile=cache.get(key);
-                    if(!tile)
-                    {
-                        loading.push({x:x,y:y,ex:ex,ey:ey,key:key});
-                        (function(ex,ey,level){
-                            var ox=ex,oy=ey;
-                            var size=tilesize;
-                            var mask=0;
-                            while(!tile && level<maxlevel){
+        var loading = [];
+
+        for (var y = th - 1; y >= 0; y--)
+            for (var x = tw - 1; x >= 0; x--) {
+                var ex = tx + x;
+                var ey = ty + y;
+                if (ex >= 0 && ey >= 0 && ex * tilesize < planewidth && ey * tilesize < planeheight) {
+                    var key = this.#cfg.Key(level, ex, ey);
+                    var tile = this.#cache.get(key);
+                    if (!tile) {
+                        loading.push({x: x, y: y, ex: ex, ey: ey, key: key});
+                        (function (ex, ey, level) {
+                            var ox = ex, oy = ey;
+                            var size = tilesize;
+                            var mask = 0;
+                            while (!tile && level < maxlevel) {
                                 size >>= 1;
-                                mask=(mask<<1)+1;
+                                mask = (mask << 1) + 1;
                                 ex >>= 1;
                                 ey >>= 1;
                                 level++;
-                                key=cfg.Key(level,ex,ey);
-                                tile=cache.get(key);
+                                key = dizcfg.Key(level, ex, ey);
+                                tile = dizcache.get(key);
                             }
-                            if(tile)
-                                ctx.drawImage(tile,(ox&mask)*size,(oy&mask)*size,size,size,x*tilesize,y*tilesize,tilesize,tilesize);
-                        })(ex,ey,level);
-                    }
-                    else
-                        drawTile(tile,x,y);
+                            if (tile)
+                                ctx.drawImage(tile, (ox & mask) * size, (oy & mask) * size, size, size, x * tilesize, y * tilesize, tilesize, tilesize);
+                        })(ex, ey, level);
+                    } else
+                        drawTile(tile, x, y);
                 }
             }
         drawImage();
 
-        (function loadloop()
-        {
-            if(loading.length===0)return;
-            var loaditem=loading.pop();
-            cfg.Load(loaditem.key,loaditem.ex,loaditem.ey,function(tile){
-                cache.put(loaditem.key,tile);
-                if(viewnumber===loadingnumber){
-                    drawTile(tile,loaditem.x,loaditem.y);
-                    drawImage();
-                    loadloop();
-                }
-            });
+        (async function loadloop() {
+            if (loading.length === 0)
+                return;
+            var loaditem = loading.pop();
+            const tile = await dizcfg.Load(loaditem.key, loaditem.ex, loaditem.ey);
+            dizcache.put(loaditem.key, tile);
+            /*if (this.#viewnumber === loadingnumber)*/ {
+                drawTile(tile, loaditem.x, loaditem.y);
+                drawImage();
+                loadloop();
+            }
         })();
     }
 
-    var pick=false;
-    var pickx;
-    var picky;
-    this.mdown=function(event)
-    {
-        pick=true;
-        pickx=event.offsetX;
-        picky=event.offsetY;
-    };
-    this.mup=function(event)
-    {
-        pick=false;
-    };
-    this.mmove=function(event)
-    {
-        if(pick) {
-            view.cutx+=(pickx-event.offsetX)*view.cutw/canvaswidth;
-            view.cuty+=(picky-event.offsetY)*view.cuth/canvasheight;
-            pickx=event.offsetX;
-            picky=event.offsetY;
-            prepare();
-        }
-    };
-    this.mwheel=function(event)
-    {
-        event.preventDefault();
-        if(event.deltaY<0)
-        {
-            view.cutx+=(event.offsetX*view.cutw/canvaswidth)*0.1;
-            view.cuty+=(event.offsetY*view.cuth/canvasheight)*0.1;
+    #pick = false;
+    #pickx;
+    #picky;
+    #mdown(event) {
+        this.#pick = true;
+        this.#pickx = event.offsetX;
+        this.#picky = event.offsetY;
+    }
+    #mup(event) {
+        this.#pick = false;
+    }
 
-            view.cutw*=0.9;
-            view.cuth=view.cutw*canvasheight/canvaswidth;
+    #mmove(event) {
+        if (this.#pick) {
+            this.#view.cutx += (this.#pickx - event.offsetX) * this.#view.cutw / this.#canvaswidth;
+            this.#view.cuty += (this.#picky - event.offsetY) * this.#view.cuth / this.#canvasheight;
+            this.#pickx = event.offsetX;
+            this.#picky = event.offsetY;
+            this.#prepare();
         }
-        else
-        {
-            view.cutw/=0.9;
-            view.cuth=view.cutw*canvasheight/canvaswidth;
-            view.cutx-=(event.offsetX*view.cutw/canvaswidth)*0.1;
-            view.cuty-=(event.offsetY*view.cuth/canvasheight)*0.1;
+    }
+    #mwheel(event) {
+        event.preventDefault();
+        if (event.deltaY < 0) {
+            this.#view.cutx += (event.offsetX * this.#view.cutw / this.#canvaswidth) * 0.1;
+            this.#view.cuty += (event.offsetY * this.#view.cuth / this.#canvasheight) * 0.1;
+
+            this.#view.cutw *= 0.9;
+            this.#view.cuth = this.#view.cutw * this.#canvasheight / this.#canvaswidth;
+        } else {
+            this.#view.cutw /= 0.9;
+            this.#view.cuth = this.#view.cutw * this.#canvasheight / this.#canvaswidth;
+            this.#view.cutx -= (event.offsetX * this.#view.cutw / this.#canvaswidth) * 0.1;
+            this.#view.cuty -= (event.offsetY * this.#view.cuth / this.#canvasheight) * 0.1;
         }
-        prepare();
-    };
-    
-    canvas.addEventListener("mousedown",this.mdown,true);
-    canvas.addEventListener("mouseup",this.mup,true);
-    canvas.addEventListener("mousemove",this.mmove,true);
-    canvas.addEventListener("wheel",this.mwheel,true);
+        this.#prepare();
+    }
 }
