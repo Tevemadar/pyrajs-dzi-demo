@@ -1,56 +1,18 @@
-class Zoomer {
+class ZoomView {
     #cache = new LRUCache(300);
     #canvas;
     #cfg;
-    #handlers = {};
     constructor(canvas, cfg) {
         this.#canvas = canvas;
         this.#cfg = cfg;
-        const h = this.#handlers;
-        canvas.addEventListener("mousedown", h.mdown = e => this.#mdown(e), true);
-        canvas.addEventListener("mouseup", h.mup = e => this.#mup(e), true);
-        canvas.addEventListener("mousemove", h.mmove = e => this.#mmove(e), true);
-        canvas.addEventListener("wheel", h.mwheel = e => this.#mwheel(e), true);
-    }
-
-    destroy() {
-        ++this.#viewnumber;
-        const c = this.#canvas;
-        const h = this.#handlers;
-        c.removeEventListener("mousedown", h.mdown, true);
-        c.removeEventListener("mouseup", h.mup, true);
-        c.removeEventListener("mousemove", h.mmove, true);
-        c.removeEventListener("wheel", h.mwheel, true);
     }
 
     #view;
-    home() {
-        const cw = this.#canvas.width;
-        const ch = this.#canvas.height;
-        const w = this.#cfg.Width;
-        const h = this.#cfg.Height;
-        if (w / h < cw / ch) {
-            this.#view = {
-                cutx: (w - h * cw / ch) / 2,
-                cuty: 0,
-                cutw: h * cw / ch,
-                cuth: h
-            };
-        } else {
-            this.#view = {
-                cutx: 0,
-                cuty: (h - w * ch / cw) / 2,
-                cutw: w,
-                cuth: w * ch / cw
-            };
-        }
-        this.#prepare();
-    }
-
     #canvaswidth;
     #canvasheight;
     #viewnumber = 0;
-    #prepare() {
+    prepare(view) {
+        this.#view = view;
         const dizcfg = this.#cfg;
         const dizcache = this.#cache;
         const dizcanvaswidth = this.#canvaswidth = this.#canvas.width;
@@ -148,7 +110,56 @@ class Zoomer {
             }
         })();
     }
+}
 
+class Zoomer {
+    #canvas;
+    #cfg;
+    #zoomer;
+    #handlers = {};
+    constructor(canvas, cfg) {
+        this.#canvas = canvas;
+        this.#cfg = cfg;
+        this.#zoomer = new ZoomView(canvas, cfg);
+        const h = this.#handlers;
+        canvas.addEventListener("mousedown", h.mdown = e => this.#mdown(e), true);
+        canvas.addEventListener("mouseup", h.mup = e => this.#mup(e), true);
+        canvas.addEventListener("mousemove", h.mmove = e => this.#mmove(e), true);
+        canvas.addEventListener("wheel", h.mwheel = e => this.#mwheel(e), true);
+    }
+
+    destroy() {
+        const c = this.#canvas;
+        const h = this.#handlers;
+        c.removeEventListener("mousedown", h.mdown, true);
+        c.removeEventListener("mouseup", h.mup, true);
+        c.removeEventListener("mousemove", h.mmove, true);
+        c.removeEventListener("wheel", h.mwheel, true);
+    }
+
+    #view;
+    home() {
+        const cw = this.#canvas.width;
+        const ch = this.#canvas.height;
+        const w = this.#cfg.Width;
+        const h = this.#cfg.Height;
+        if (w / h < cw / ch) {
+            this.#view = {
+                cutx: (w - h * cw / ch) / 2,
+                cuty: 0,
+                cutw: h * cw / ch,
+                cuth: h
+            };
+        } else {
+            this.#view = {
+                cutx: 0,
+                cuty: (h - w * ch / cw) / 2,
+                cutw: w,
+                cuth: w * ch / cw
+            };
+        }
+        this.#zoomer.prepare(this.#view);
+    }
     #pick = false;
     #pickx;
     #picky;
@@ -157,33 +168,34 @@ class Zoomer {
         this.#pickx = event.offsetX;
         this.#picky = event.offsetY;
     }
-    #mup(event) {
+    #mup(/*event*/) {
         this.#pick = false;
     }
 
     #mmove(event) {
         if (this.#pick) {
-            this.#view.cutx += (this.#pickx - event.offsetX) * this.#view.cutw / this.#canvaswidth;
-            this.#view.cuty += (this.#picky - event.offsetY) * this.#view.cuth / this.#canvasheight;
+            this.#view.cutx += (this.#pickx - event.offsetX) * this.#view.cutw / this.#canvas.width;
+            this.#view.cuty += (this.#picky - event.offsetY) * this.#view.cuth / this.#canvas.height;
             this.#pickx = event.offsetX;
             this.#picky = event.offsetY;
-            this.#prepare();
+            this.#zoomer.prepare(this.#view);
         }
     }
     #mwheel(event) {
         event.preventDefault();
+        const cw = this.#canvas.width;
+        const ch = this.#canvas.height;
         if (event.deltaY < 0) {
-            this.#view.cutx += (event.offsetX * this.#view.cutw / this.#canvaswidth) * 0.1;
-            this.#view.cuty += (event.offsetY * this.#view.cuth / this.#canvasheight) * 0.1;
-
+            this.#view.cutx += (event.offsetX * this.#view.cutw / cw) * 0.1;
+            this.#view.cuty += (event.offsetY * this.#view.cuth / ch) * 0.1;
             this.#view.cutw *= 0.9;
-            this.#view.cuth = this.#view.cutw * this.#canvasheight / this.#canvaswidth;
+            this.#view.cuth = this.#view.cutw * ch / cw;
         } else {
             this.#view.cutw /= 0.9;
-            this.#view.cuth = this.#view.cutw * this.#canvasheight / this.#canvaswidth;
-            this.#view.cutx -= (event.offsetX * this.#view.cutw / this.#canvaswidth) * 0.1;
-            this.#view.cuty -= (event.offsetY * this.#view.cuth / this.#canvasheight) * 0.1;
+            this.#view.cuth = this.#view.cutw * ch / cw;
+            this.#view.cutx -= (event.offsetX * this.#view.cutw / cw) * 0.1;
+            this.#view.cuty -= (event.offsetY * this.#view.cuth / ch) * 0.1;
         }
-        this.#prepare();
+        this.#zoomer.prepare(this.#view);
     }
 }
