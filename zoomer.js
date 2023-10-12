@@ -8,29 +8,21 @@ class ZoomView {
     }
 
     #view;
-    #canvaswidth;
-    #canvasheight;
-    #viewnumber = 0;
+    stop(){
+        this.#view=null;
+    }
     prepare(view) {
-        this.#view = view;
-        const dizcfg = this.#cfg;
+        let {cutx,cuty,cutw,cuth}=view;
+        this.#view = {cutx,cuty,cutw,cuth};
+        const {Width,Height,TileSize,MaxLevel,/*Key,*/Load,FillStyle} = this.#cfg;
         const dizcache = this.#cache;
-        const dizcanvaswidth = this.#canvaswidth = this.#canvas.width;
-        const dizcanvasheight = this.#canvasheight = this.#canvas.height;
+        const canvaswidth = this.#canvas.width;
+        const canvasheight = this.#canvas.height;
 
-        var cutx = this.#view.cutx;
-        var cuty = this.#view.cuty;
-        var cutw = this.#view.cutw;
-        var cuth = this.#view.cuth;
-
-        var loadingnumber = ++this.#viewnumber;
-
-        var planewidth = this.#cfg.Width;
-        var planeheight = this.#cfg.Height;
-        var tilesize = this.#cfg.TileSize;
-        var maxlevel = this.#cfg.MaxLevel;
+        var planewidth = Width;
+        var planeheight = Height;
         var level = 0;
-        while ((cutw >= this.#canvaswidth * 2) && (cuth >= this.#canvasheight * 2) && (level < maxlevel)) {
+        while ((cutw >= canvaswidth * 2) && (cuth >= canvasheight * 2) && (level < MaxLevel)) {
             planewidth = (planewidth + 1) >> 1;
             planeheight = (planeheight + 1) >> 1;
             cutw = (cutw + 1) >> 1;
@@ -39,29 +31,29 @@ class ZoomView {
             cuty = (cuty + 1) >> 1;
             level++;
         }
-        var tx = Math.floor(cutx / tilesize);
-        var ty = Math.floor(cuty / tilesize);
-        var tw = Math.floor((cutx + cutw) / tilesize - tx + 1);
-        var th = Math.floor((cuty + cuth) / tilesize - ty + 1);
+        var tx = Math.floor(cutx / TileSize);
+        var ty = Math.floor(cuty / TileSize);
+        var tw = Math.floor((cutx + cutw) / TileSize - tx + 1);
+        var th = Math.floor((cuty + cuth) / TileSize - ty + 1);
 
         var image = document.createElement("canvas");
-        image.width = tw * tilesize;
-        image.height = th * tilesize;
+        image.width = tw * TileSize;
+        image.height = th * TileSize;
         var ctx = image.getContext("2d");
 
         var mainctx = this.#canvas.getContext("2d");
-        cutx = (cutx % tilesize + tilesize) % tilesize;
-        cuty = (cuty % tilesize + tilesize) % tilesize;
+        cutx = (cutx % TileSize + TileSize) % TileSize;
+        cuty = (cuty % TileSize + TileSize) % TileSize;
 
         function drawImage() {
             mainctx.globalAlpha = 1;
-            mainctx.fillStyle = dizcfg.FillStyle || "#FFFFFF";
-            mainctx.fillRect(0, 0, dizcanvaswidth, dizcanvasheight);
-            mainctx.drawImage(image, cutx, cuty, cutw, cuth, 0, 0, dizcanvaswidth, dizcanvasheight);
+            mainctx.fillStyle = FillStyle || "#FFFFFF";
+            mainctx.fillRect(0, 0, canvaswidth, canvasheight);
+            mainctx.drawImage(image, cutx, cuty, cutw, cuth, 0, 0, canvaswidth, canvasheight);
         }
 
         function drawTile(tile, x, y) {
-            ctx.drawImage(tile, x * tilesize, y * tilesize);
+            ctx.drawImage(tile, x * TileSize, y * TileSize);
         }
 
         var loading = [];
@@ -70,40 +62,44 @@ class ZoomView {
             for (var x = tw - 1; x >= 0; x--) {
                 var ex = tx + x;
                 var ey = ty + y;
-                if (ex >= 0 && ey >= 0 && ex * tilesize < planewidth && ey * tilesize < planeheight) {
+                if (ex >= 0 && ey >= 0 && ex * TileSize < planewidth && ey * TileSize < planeheight) {
                     var key = this.#cfg.Key(level, ex, ey);
                     var tile = this.#cache.get(key);
                     if (!tile) {
                         loading.push({x: x, y: y, ex: ex, ey: ey, key: key});
-                        (function (ex, ey, level) {
+                        /*(function (ex, ey, level)*/ {
                             var ox = ex, oy = ey;
-                            var size = tilesize;
+                            var size = TileSize;
                             var mask = 0;
-                            while (!tile && level < maxlevel) {
+                            var templevel = level;
+                            while (!tile && templevel < MaxLevel) {
                                 size >>= 1;
                                 mask = (mask << 1) + 1;
                                 ex >>= 1;
                                 ey >>= 1;
-                                level++;
-                                key = dizcfg.Key(level, ex, ey);
+                                templevel++;
+                                key = this.#cfg.Key(templevel, ex, ey);
                                 tile = dizcache.get(key);
                             }
                             if (tile)
-                                ctx.drawImage(tile, (ox & mask) * size, (oy & mask) * size, size, size, x * tilesize, y * tilesize, tilesize, tilesize);
-                        })(ex, ey, level);
+                                ctx.drawImage(tile, (ox & mask) * size, (oy & mask) * size, size, size, x * TileSize, y * TileSize, TileSize, TileSize);
+                        }/*)(ex, ey, level)*/;
                     } else
                         drawTile(tile, x, y);
                 }
             }
         drawImage();
+        
+        const diz = this;
+        const curr = this.#view;
 
         (async function loadloop() {
             if (loading.length === 0)
                 return;
             var loaditem = loading.pop();
-            const tile = await dizcfg.Load(loaditem.key, loaditem.ex, loaditem.ey);
+            const tile = await Load(loaditem.key, loaditem.ex, loaditem.ey);
             dizcache.put(loaditem.key, tile);
-            /*if (this.#viewnumber === loadingnumber)*/ {
+            if (diz.#view === curr) {
                 drawTile(tile, loaditem.x, loaditem.y);
                 drawImage();
                 loadloop();
@@ -129,6 +125,7 @@ class Zoomer {
     }
 
     destroy() {
+        this.#zoomer.stop();
         const c = this.#canvas;
         const h = this.#handlers;
         c.removeEventListener("mousedown", h.mdown, true);
