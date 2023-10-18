@@ -71,7 +71,7 @@ class ZoomView {
                         var mask = 0;
                         var templevel = level;
                         while (!tile && templevel < MaxLevel) {
-                            size >>= 1;
+                            size /= 2;
                             mask = (mask << 1) + 1;
                             ex >>= 1;
                             ey >>= 1;
@@ -96,6 +96,16 @@ class ZoomView {
                 drawImage();
             }
         }
+        
+//        while(loading.length && this.#view === curr) {
+//            var loaditem = loading.pop();
+//            const tile = await Load(loaditem.key, loaditem.ex, loaditem.ey);
+//            this.#cache.put(loaditem.key, tile);
+//            if (this.#view === curr) {
+//                drawTile(tile, loaditem.x, loaditem.y);
+//                drawImage();
+//            }
+//        }
     }
 }
 
