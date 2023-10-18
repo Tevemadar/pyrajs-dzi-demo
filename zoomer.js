@@ -11,11 +11,10 @@ class ZoomView {
     stop(){
         this.#view=null;
     }
-    prepare(view) {
+    async prepare(view) {
         let {cutx,cuty,cutw,cuth}=view;
-        this.#view = {cutx,cuty,cutw,cuth};
+        const curr = this.#view = {cutx,cuty,cutw,cuth};
         const {Width,Height,TileSize,MaxLevel,/*Key,*/Load,FillStyle} = this.#cfg;
-        const dizcache = this.#cache;
         const canvaswidth = this.#canvas.width;
         const canvasheight = this.#canvas.height;
 
@@ -67,44 +66,36 @@ class ZoomView {
                     var tile = this.#cache.get(key);
                     if (!tile) {
                         loading.push({x: x, y: y, ex: ex, ey: ey, key: key});
-                        /*(function (ex, ey, level)*/ {
-                            var ox = ex, oy = ey;
-                            var size = TileSize;
-                            var mask = 0;
-                            var templevel = level;
-                            while (!tile && templevel < MaxLevel) {
-                                size >>= 1;
-                                mask = (mask << 1) + 1;
-                                ex >>= 1;
-                                ey >>= 1;
-                                templevel++;
-                                key = this.#cfg.Key(templevel, ex, ey);
-                                tile = dizcache.get(key);
-                            }
-                            if (tile)
-                                ctx.drawImage(tile, (ox & mask) * size, (oy & mask) * size, size, size, x * TileSize, y * TileSize, TileSize, TileSize);
-                        }/*)(ex, ey, level)*/;
+                        var ox = ex, oy = ey;
+                        var size = TileSize;
+                        var mask = 0;
+                        var templevel = level;
+                        while (!tile && templevel < MaxLevel) {
+                            size >>= 1;
+                            mask = (mask << 1) + 1;
+                            ex >>= 1;
+                            ey >>= 1;
+                            templevel++;
+                            key = this.#cfg.Key(templevel, ex, ey);
+                            tile = this.#cache.get(key);
+                        }
+                        if (tile)
+                            ctx.drawImage(tile, (ox & mask) * size, (oy & mask) * size, size, size, x * TileSize, y * TileSize, TileSize, TileSize);
                     } else
                         drawTile(tile, x, y);
                 }
             }
         drawImage();
         
-        const diz = this;
-        const curr = this.#view;
-
-        (async function loadloop() {
-            if (loading.length === 0)
-                return;
+        while(loading.length && this.#view === curr) {
             var loaditem = loading.pop();
             const tile = await Load(loaditem.key, loaditem.ex, loaditem.ey);
-            dizcache.put(loaditem.key, tile);
-            if (diz.#view === curr) {
+            this.#cache.put(loaditem.key, tile);
+            if (this.#view === curr) {
                 drawTile(tile, loaditem.x, loaditem.y);
                 drawImage();
-                loadloop();
             }
-        })();
+        }
     }
 }
 
