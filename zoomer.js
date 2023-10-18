@@ -44,18 +44,42 @@ class ZoomView {
         cutx = (cutx % TileSize + TileSize) % TileSize;
         cuty = (cuty % TileSize + TileSize) % TileSize;
 
+        const dizcfg=this.#cfg;
+        const dizcache=this.#cache;
         function drawImage() {
+            for(let y=0;y<th;y++)
+                for(let x=0;x<tw;x++){
+                    const ox=tx+x;
+                    const oy=ty+y;
+                    let ex=ox;
+                    let ey=oy;
+                    if (ex >= 0 && ey >= 0 && ex * TileSize < planewidth && ey * TileSize < planeheight) {
+                        let clip=TileSize;
+                        let mask=0;
+                        let lvl=level;
+                        let key = dizcfg.Key(lvl, ex, ey);
+                        let tile = dizcache.get(key);
+                        while(!tile && lvl<MaxLevel){
+                            clip/=2;
+                            mask = (mask << 1) + 1;
+                            ex >>= 1;
+                            ey >>= 1;
+                            lvl++;
+                            key = dizcfg.Key(lvl, ex, ey);
+                            tile = dizcache.get(key);
+                        }
+                        if (tile)
+                            ctx.drawImage(tile, (ox & mask) * clip, (oy & mask) * clip, clip, clip, x * TileSize, y * TileSize, TileSize, TileSize);
+                    }
+                }
+            
             mainctx.globalAlpha = 1;
             mainctx.fillStyle = FillStyle || "#FFFFFF";
             mainctx.fillRect(0, 0, canvaswidth, canvasheight);
             mainctx.drawImage(image, cutx, cuty, cutw, cuth, 0, 0, canvaswidth, canvasheight);
         }
 
-        function drawTile(tile, x, y) {
-            ctx.drawImage(tile, x * TileSize, y * TileSize);
-        }
-
-        var loading = [];
+        var loading = new Map;
 
         for (var y = th - 1; y >= 0; y--)
             for (var x = tw - 1; x >= 0; x--) {
@@ -64,35 +88,26 @@ class ZoomView {
                 if (ex >= 0 && ey >= 0 && ex * TileSize < planewidth && ey * TileSize < planeheight) {
                     var key = this.#cfg.Key(level, ex, ey);
                     var tile = this.#cache.get(key);
-                    if (!tile) {
-                        loading.push({x: x, y: y, ex: ex, ey: ey, key: key});
-                        var ox = ex, oy = ey;
-                        var size = TileSize;
-                        var mask = 0;
                         var templevel = level;
                         while (!tile && templevel < MaxLevel) {
-                            size /= 2;
-                            mask = (mask << 1) + 1;
+                            loading.set(key,{ex, ey, key, level:templevel});
                             ex >>= 1;
                             ey >>= 1;
                             templevel++;
                             key = this.#cfg.Key(templevel, ex, ey);
                             tile = this.#cache.get(key);
                         }
-                        if (tile)
-                            ctx.drawImage(tile, (ox & mask) * size, (oy & mask) * size, size, size, x * TileSize, y * TileSize, TileSize, TileSize);
-                    } else
-                        drawTile(tile, x, y);
                 }
             }
         drawImage();
+        loading=Array.from(loading.values());
+        loading.sort((x,y)=>x.level-y.level);
         
         while(loading.length && this.#view === curr) {
-            var loaditem = loading.pop();
-            const tile = await Load(loaditem.key, loaditem.ex, loaditem.ey);
-            this.#cache.put(loaditem.key, tile);
+            const {ex,ey,key} = loading.pop();
+            const tile = await Load(key, ex, ey);
+            this.#cache.put(key, tile);
             if (this.#view === curr) {
-                drawTile(tile, loaditem.x, loaditem.y);
                 drawImage();
             }
         }
