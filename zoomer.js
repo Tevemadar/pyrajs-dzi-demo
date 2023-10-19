@@ -41,12 +41,13 @@ class ZoomView {
         image.height = th * TileSize;
         var ctx = image.getContext("2d");
         
-        const mainctx = this.#canvas.getContext("2d");
-        const cliprect=[-cutx*canvaswidth/cutw,-cuty*canvasheight/cuth,planewidth*canvaswidth/cutw,planeheight*canvasheight/cuth];
+        const cliprect = new Path2D();
+        cliprect.rect(-cutx*canvaswidth/cutw,-cuty*canvasheight/cuth,planewidth*canvaswidth/cutw,planeheight*canvasheight/cuth);
 
         cutx = (cutx % TileSize + TileSize) % TileSize;
         cuty = (cuty % TileSize + TileSize) % TileSize;
 
+        const mainctx = this.#canvas.getContext("2d");
         const dizcfg=this.#cfg;
         const dizcache=this.#cache;
         function drawImage() {
@@ -79,13 +80,12 @@ class ZoomView {
             mainctx.globalAlpha = 1;
             mainctx.fillStyle = FillStyle || "#FFFFFF";
             mainctx.fillRect(0, 0, canvaswidth, canvasheight);
-            mainctx.strokeStyle = "red";
-            mainctx.rect(...cliprect);
 //            mainctx.save();
-            mainctx.clip();
+            mainctx.clip(cliprect);
             mainctx.drawImage(image, cutx, cuty, cutw, cuth, 0, 0, canvaswidth, canvasheight);
 //            mainctx.restore();
-//            mainctx.stroke();
+//            mainctx.strokeStyle = "red";
+//            mainctx.stroke(cliprect);
         }
 
         const loadmap = new Map;
@@ -109,22 +109,30 @@ class ZoomView {
         drawImage();
         const loading=Array.from(loadmap.values());
         loading.sort((x,y)=>x.level-y.level);
-        
-        while(loading.length && this.#view === curr) {
-            const {ex,ey,key} = loading.pop();
-            const tile = await Load(key, ex, ey);
-            this.#cache.put(key, tile);
-            if (this.#view === curr) {
-                drawImage();
-            }
+
+        let queued = new Set();
+        while((loading.length || queued.size) && this.#view === curr) {
+            while(loading.length && queued.size<10){
+                const promise=new Promise(async resolve=>{
+                    const {ex,ey,key} = loading.pop();
+                    const tile = await Load(key, ex, ey);
+                    this.#cache.put(key, tile);
+                    if (this.#view === curr) {
+                        drawImage();
+                    }
+                    queued.delete(promise);
+                    resolve();
+                });
+                queued.add(promise);
+            };
+            await Promise.race(queued);
         }
         
 //        while(loading.length && this.#view === curr) {
-//            var loaditem = loading.pop();
-//            const tile = await Load(loaditem.key, loaditem.ex, loaditem.ey);
-//            this.#cache.put(loaditem.key, tile);
+//            const {ex,ey,key} = loading.pop();
+//            const tile = await Load(key, ex, ey);
+//            this.#cache.put(key, tile);
 //            if (this.#view === curr) {
-//                drawTile(tile, loaditem.x, loaditem.y);
 //                drawImage();
 //            }
 //        }
