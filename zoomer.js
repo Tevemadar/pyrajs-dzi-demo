@@ -1,4 +1,5 @@
 class ZoomView {
+    "use strict";
     #cache = new LRUCache(300);
     #canvas;
     #cfg;
@@ -39,8 +40,10 @@ class ZoomView {
         image.width = tw * TileSize;
         image.height = th * TileSize;
         var ctx = image.getContext("2d");
+        
+        const mainctx = this.#canvas.getContext("2d");
+        const cliprect=[-cutx*canvaswidth/cutw,-cuty*canvasheight/cuth,planewidth*canvaswidth/cutw,planeheight*canvasheight/cuth];
 
-        var mainctx = this.#canvas.getContext("2d");
         cutx = (cutx % TileSize + TileSize) % TileSize;
         cuty = (cuty % TileSize + TileSize) % TileSize;
 
@@ -72,35 +75,39 @@ class ZoomView {
                             ctx.drawImage(tile, (ox & mask) * clip, (oy & mask) * clip, clip, clip, x * TileSize, y * TileSize, TileSize, TileSize);
                     }
                 }
-            
+            mainctx.reset();
             mainctx.globalAlpha = 1;
             mainctx.fillStyle = FillStyle || "#FFFFFF";
             mainctx.fillRect(0, 0, canvaswidth, canvasheight);
+            mainctx.strokeStyle = "red";
+            mainctx.rect(...cliprect);
+//            mainctx.save();
+            mainctx.clip();
             mainctx.drawImage(image, cutx, cuty, cutw, cuth, 0, 0, canvaswidth, canvasheight);
+//            mainctx.restore();
+//            mainctx.stroke();
         }
 
-        var loading = new Map;
+        const loadmap = new Map;
 
-        for (var y = th - 1; y >= 0; y--)
-            for (var x = tw - 1; x >= 0; x--) {
-                var ex = tx + x;
-                var ey = ty + y;
+        for (let x = 0; x < tw; x++)
+            for (let y = 0; y < th; y++) {
+                let ex = tx + x;
+                let ey = ty + y;
                 if (ex >= 0 && ey >= 0 && ex * TileSize < planewidth && ey * TileSize < planeheight) {
-                    var key = this.#cfg.Key(level, ex, ey);
-                    var tile = this.#cache.get(key);
-                        var templevel = level;
-                        while (!tile && templevel < MaxLevel) {
-                            loading.set(key,{ex, ey, key, level:templevel});
-                            ex >>= 1;
-                            ey >>= 1;
-                            templevel++;
-                            key = this.#cfg.Key(templevel, ex, ey);
-                            tile = this.#cache.get(key);
-                        }
+                    let templevel = level;
+                    let key = this.#cfg.Key(level, ex, ey);
+                    while (!this.#cache.get(key) && templevel < MaxLevel) {
+                        loadmap.set(key, {ex, ey, key, level: templevel});
+                        ex >>= 1;
+                        ey >>= 1;
+                        templevel++;
+                        key = this.#cfg.Key(templevel, ex, ey);
+                    }
                 }
             }
         drawImage();
-        loading=Array.from(loading.values());
+        const loading=Array.from(loadmap.values());
         loading.sort((x,y)=>x.level-y.level);
         
         while(loading.length && this.#view === curr) {
