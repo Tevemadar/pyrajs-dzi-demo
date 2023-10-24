@@ -45,7 +45,7 @@
                 DZIcfg.Key = function (level, x, y) {
                     return set + "/" + (this.MaxLevel - level) + "/" + x + "_" + y + "." + this.Format;
                 };
-                DZIcfg.Load = async function (key, x, y, next) {
+                DZIcfg.Load = async function (key, x, y) {
                     const img = document.createElement("img");
                     await new Promise(resolve => {
                         img.onload = resolve;
