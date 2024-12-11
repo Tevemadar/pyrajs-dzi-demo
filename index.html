@@ -13,8 +13,8 @@
                 cursor: crosshair;
             }
         </style>
-        <script src="cache.js"></script>
-        <script src="zoomer.js"></script>
+        <script src="https://cdn.jsdelivr.net/gh/Tevemadar/pyrajs-core/cache.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/gh/Tevemadar/pyrajs-core/zoomer.min.js"></script>
         <script>
             var set = "Pocak";
             function startup() {
@@ -34,6 +34,7 @@
                     Height: parseInt(size.getAttribute("Height")),
                     MaxLevel: 0
                 };
+
                 var w = DZIcfg.Width;
                 var h = DZIcfg.Height;
                 while (w > 1 || h > 1) {
@@ -42,14 +43,11 @@
                     DZIcfg.MaxLevel++;
                 }
 
-                DZIcfg.Key = function (level, x, y) {
-                    return set + "/" + (this.MaxLevel - level) + "/" + x + "_" + y + "." + this.Format;
-                };
-                DZIcfg.Load = async function (key, x, y) {
+                DZIcfg.Load = async function (level, x, y) {
                     const img = document.createElement("img");
                     await new Promise(resolve => {
                         img.onload = resolve;
-                        img.src = key;
+                        img.src = `${set}/${DZIcfg.MaxLevel - level}/${x}_${y}.${DZIcfg.Format}`;
                     });
                     const canvas = document.createElement("canvas");
                     canvas.width = DZIcfg.TileSize;
